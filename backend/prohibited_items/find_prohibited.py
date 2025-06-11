@@ -1,23 +1,32 @@
 import json
 import time
-import google.generativeai as genai
-from rapidfuzz import process, fuzz  # Faster fuzzy matching
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+import google.generativeai as genai
+from rapidfuzz import process, fuzz
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Load JSON file
-json_path = r"C:\Users\Asus\Desktop\RouteSyncAI\RouteSyncAI\backend\prohibited_items\logistics_data.json"
-with open(json_path, "r", encoding='utf-8') as f:
-    logistics_data = json.load(f)
+# Get the current directory and construct paths relative to the module
+BASE_DIR = Path(__file__).parent
+JSON_PATH = BASE_DIR / "logistics_data.json"
+
+# Load JSON file with proper error handling
+try:
+    with open(JSON_PATH, "r", encoding='utf-8') as f:
+        logistics_data = json.load(f)
+    print(f"✅ Logistics data loaded successfully from {JSON_PATH}")
+except FileNotFoundError:
+    print(f"❌ Logistics data file not found at {JSON_PATH}")
+    logistics_data = {}
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))  # Replace with actual key
 
 # Extract item names from the dataset
-item_names = list(logistics_data.keys())
+item_names = list(logistics_data.keys()) if logistics_data else []
 
 # Function to retrieve relevant items using **fuzzy matching only**
 def retrieve_relevant_items(query, top_n=10):

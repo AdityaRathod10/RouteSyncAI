@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Query, HTTPException
 import pickle
 import heapq
+import os
+from pathlib import Path
 from math import radians, sin, cos, sqrt, atan2
 from typing import List, Optional, Literal
 from prohibited_items import find_prohibited
@@ -23,9 +25,19 @@ app.add_middleware(
     expose_headers=["*"],  # Expose all headers to the client
 )
 
-# Load the graph once
-with open(r'C:\Users\Asus\Desktop\RouteSyncAI\RouteSyncAI\backend\graph_final_8_precalc.pkl', "rb") as G:
-    roadsn = pickle.load(G)
+# Get the current directory and construct paths relative to the project
+BASE_DIR = Path(__file__).parent
+GRAPH_PATH = BASE_DIR / "graph_final_8_precalc.pkl"
+
+# Load the graph once with proper error handling
+try:
+    with open(GRAPH_PATH, "rb") as G:
+        roadsn = pickle.load(G)
+    print(f"✅ Graph loaded successfully from {GRAPH_PATH}")
+except FileNotFoundError:
+    print(f"❌ Graph file not found at {GRAPH_PATH}")
+    # You might want to create a fallback or exit gracefully
+    roadsn = None
 
 # CO2 emission factors
 EMISSION_FACTORS = {
