@@ -2,7 +2,7 @@
 
 An **AI-powered logistics optimization tool** that determines the most efficient **cross-border shipping routes** using multiple transport modes (**air, sea, land, or hybrid combinations**). It optimizes key constraints like **cost, transit time, regulatory feasibility, and carbon footprint**.  
 
-Developed during **LogiThon 2025 (IIT Bombay)** and **Softlink Global**, this project leverages AI and geospatial data to enhance decision-making in logistics and supply chain management.  
+Developed during **LogiThon 2025** Organized by **IIT Bombay** and **Softlink Global**, this project leverages AI and geospatial data to enhance decision-making in logistics and supply chain management.  
 
 ---
 
