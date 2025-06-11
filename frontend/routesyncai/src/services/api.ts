@@ -27,7 +27,7 @@ export const testCors = async () => {
   }
 };
 
-export const findPaths = async (data: any) => {
+export const findPaths = async (data: Record<string, unknown>) => {
   try {
     // Convert form values to match backend expectations
     const formattedData = {

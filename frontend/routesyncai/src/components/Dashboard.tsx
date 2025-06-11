@@ -6,7 +6,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -83,18 +82,20 @@ interface RouteOption {
 }
 
 interface CurrencyResponse {
-  provider: string;
-  terms: string;
   base: string;
   date: string;
-  time_last_updated: number;
   rates: Record<string, number>;
 }
 
 interface WeatherItem {
-  dt_txt: string;
-  weather: Array<{ main: string }>;
-  main: { temp: number };
+  dt: number;
+  main: {
+    temp: number;
+  };
+  weather: Array<{
+    main: string;
+    description: string;
+  }>;
   pop: number;
 }
 
@@ -111,7 +112,7 @@ const useShipments = () => {
         if (!response.ok) throw new Error("Failed to fetch shipments");
         const data = await response.json();
         setShipments(data);
-      } catch (err) {
+      } catch {
         setError("Failed to load shipments");
       } finally {
         setLoading(false);
@@ -136,7 +137,15 @@ const useDisasters = () => {
         const data = await response.json();
 
         // Map the API response to the Disaster interface
-        const mappedDisasters = data.events.features.map((feature: any) => ({
+        const mappedDisasters = data.events.features.map((feature: {
+          properties: {
+            eventtype?: string;
+            country?: string;
+            severitydata?: { severity?: number };
+            fromdate?: string;
+            name?: string;
+          };
+        }) => ({
           type: feature.properties.eventtype || "Unknown",
           location: feature.properties.country || "Unknown",
           severity: feature.properties.severitydata?.severity || 1,
@@ -145,7 +154,7 @@ const useDisasters = () => {
         }));
 
         setDisasters(mappedDisasters);
-      } catch (err) {
+      } catch {
         setError("Failed to load disasters");
       } finally {
         setLoading(false);
@@ -166,35 +175,22 @@ const useCurrencies = () => {
     const fetchCurrencies = async () => {
       try {
         const response = await fetch(
-          "https://api.exchangerate-api.com/v4/latest/INR"
+          "https://api.exchangerate-api.com/v4/latest/USD"
         );
         if (!response.ok) throw new Error("Failed to fetch currencies");
         const data: CurrencyResponse = await response.json();
 
-        const majorCurrencies = [
-          "USD",
-          "EUR",
-          "GBP",
-          "JPY",
-          "CNY",
-          "CAD",
-          "AUD",
-          "CHF",
-          "HKD",
-          "SGD",
-          "INR",
-        ];
-        setCurrencies(
-          Object.entries(data.rates)
-            .filter(([code]) => majorCurrencies.includes(code))
-            .map(([code, rate]) => ({
-              code,
-              name: getCurrencyName(code),
-              rate,
-              change: Math.random() * 2 - 1, // Mock change for demo
-            }))
-        );
-      } catch (err) {
+        const currencyRates: CurrencyRate[] = Object.entries(data.rates)
+          .slice(0, 10)
+          .map(([code, rate]) => ({
+            code,
+            name: code,
+            rate,
+            change: Math.random() * 4 - 2, // Mock change percentage
+          }));
+
+        setCurrencies(currencyRates);
+      } catch {
         setError("Failed to load currencies");
       } finally {
         setLoading(false);
@@ -214,30 +210,23 @@ const useWeather = () => {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        const weatherApiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-        if (!weatherApiKey) throw new Error("Weather API key is missing");
-
         const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/forecast?q=London&appid=${weatherApiKey}`
+          `https://api.openweathermap.org/data/2.5/forecast?q=London&appid=${process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY}&units=metric`
         );
         if (!response.ok) throw new Error("Failed to fetch weather");
         const data = await response.json();
 
-        const dailyForecasts = data.list
-          .filter((_: WeatherItem, index: number) => index % 8 === 0) // Get one forecast per day
-          .map((item: WeatherItem) => ({
-            day: new Date(item.dt_txt).toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            }),
-            condition: item.weather[0].main,
-            temperature: kelvinToCelsius(item.main.temp),
-            precipitation: Math.round(item.pop * 100),
-          }));
+        const forecasts: WeatherForecast[] = data.list.slice(0, 5).map((item: WeatherItem) => ({
+          day: new Date(item.dt * 1000).toLocaleDateString("en-US", {
+            weekday: "short",
+          }),
+          condition: item.weather[0].main,
+          temperature: Math.round(item.main.temp),
+          precipitation: Math.round(item.pop * 100),
+        }));
 
-        setWeather(dailyForecasts);
-      } catch (err) {
+        setWeather(forecasts);
+      } catch {
         setError("Failed to load weather");
       } finally {
         setLoading(false);
@@ -249,30 +238,7 @@ const useWeather = () => {
   return { weather, loading, error };
 };
 
-// Helper functions
-const kelvinToCelsius = (kelvin: number) => {
-  return Math.round((kelvin - 273.15) * 10) / 10;
-};
-
-const getCurrencyName = (code: string) => {
-  const currencyNames: Record<string, string> = {
-    USD: "US Dollar",
-    EUR: "Euro",
-    GBP: "British Pound",
-    JPY: "Japanese Yen",
-    CNY: "Chinese Yuan",
-    CAD: "Canadian Dollar",
-    AUD: "Australian Dollar",
-    CHF: "Swiss Franc",
-    HKD: "Hong Kong Dollar",
-    SGD: "Singapore Dollar",
-    INR: "Indian Rupee",
-  };
-  return currencyNames[code] || code;
-};
-
-// Dashboard Component
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
   const {
     shipments,
     loading: shipmentsLoading,
@@ -294,61 +260,25 @@ const Dashboard = () => {
     error: weatherError,
   } = useWeather();
 
-  const [selectedShipment, setSelectedShipment] = useState<string | null>(null);
-  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Fetch route options when a shipment is selected
-  useEffect(() => {
-    if (selectedShipment) {
-      const fetchRouteOptions = async () => {
-        try {
-          const response = await fetch(
-            `/api/route-options?shipmentId=${selectedShipment}`
-          );
-          if (!response.ok) throw new Error("Failed to fetch route options");
-          const data = await response.json();
-          setRouteOptions(data);
-        } catch (error) {
-          console.error("Error fetching route options:", error);
-          setRouteOptions([]);
-        }
-      };
-      fetchRouteOptions();
-    } else {
-      setRouteOptions([]);
-    }
-  }, [selectedShipment]);
 
   // Mock data for charts
   const weeklyShipmentData = [
     { name: "Mon", shipments: 12 },
     { name: "Tue", shipments: 19 },
-    { name: "Wed", shipments: 15 },
-    { name: "Thu", shipments: 22 },
-    { name: "Fri", shipments: 27 },
-    { name: "Sat", shipments: 10 },
-    { name: "Sun", shipments: 8 },
+    { name: "Wed", shipments: 3 },
+    { name: "Thu", shipments: 5 },
+    { name: "Fri", shipments: 2 },
+    { name: "Sat", shipments: 3 },
+    { name: "Sun", shipments: 9 },
   ];
 
-  // Derive cost by priority data
-  const getCostByPriorityData = () => {
-    const priorityCosts: Record<string, number> = {};
-
-    shipments.forEach((shipment) => {
-      const key = shipment.priority;
-      if (priorityCosts[key]) {
-        priorityCosts[key] += shipment.cargo_weight; // Use cargo_weight as a placeholder for cost
-      } else {
-        priorityCosts[key] = shipment.cargo_weight;
-      }
-    });
-
-    return Object.entries(priorityCosts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-  };
+  const shipmentsByStatus = [
+    { name: "Delivered", value: 400, color: "#10B981" },
+    { name: "In Transit", value: 300, color: "#3B82F6" },
+    { name: "Pending", value: 200, color: "#F59E0B" },
+    { name: "Delayed", value: 100, color: "#EF4444" },
+  ];
 
   const COLORS = [
     "#0088FE",
@@ -420,290 +350,188 @@ const Dashboard = () => {
             <AlertCircle className="h-4 w-4" />
             Disasters
           </TabsTrigger>
-          <TabsTrigger value="currencies" className="flex items-center gap-1">
-            <TrendingUp className="h-4 w-4" />
-            Currencies
-          </TabsTrigger>
-          <TabsTrigger value="weather">Weather</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="shipments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Shipments</CardTitle>
-              <CardDescription>
-                Manage and track your shipments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {shipments.length === 0 ? (
-                <div className="text-center py-4">No shipments found.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Origin</TableHead>
-                        <TableHead>Destination</TableHead>
-                        <TableHead>Cargo Weight</TableHead>
-                        <TableHead>Cargo Volume</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Created At</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>User ID</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {shipments.map((shipment) => (
-                        <TableRow key={shipment.id}>
-                          <TableCell>{shipment.id}</TableCell>
-                          <TableCell>{shipment.origin}</TableCell>
-                          <TableCell>{shipment.destination}</TableCell>
-                          <TableCell>{shipment.cargo_weight} kg</TableCell>
-                          <TableCell>{shipment.cargo_volume} m³</TableCell>
-                          <TableCell>{shipment.priority}</TableCell>
-                          <TableCell>
-                            {new Date(shipment.createdAt).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={
-                                shipment.status === "DELIVERED"
-                                  ? "bg-green-500"
-                                  : shipment.status === "IN_TRANSIT"
-                                  ? "bg-blue-500"
-                                  : shipment.status === "PENDING"
-                                  ? "bg-yellow-500"
-                                  : "bg-gray-500"
-                              }
-                            >
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{shipment.userId}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <TabsContent value="shipments" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Shipments
+                </CardTitle>
+                <Truck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{shipments.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  <TrendingUp className="h-3 w-3 inline mr-1" />
+                  +20.1% from last month
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-        <TabsContent value="disasters">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Weekly Shipments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={weeklyShipmentData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="shipments" fill="#3B82F6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Shipments by Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={shipmentsByStatus}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {shipmentsByStatus.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Disasters</CardTitle>
+              <CardTitle>Recent Shipments</CardTitle>
               <CardDescription>
-                Recent natural disasters that may impact shipments.
+                A list of your recent shipments and their status.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {disasters.length === 0 ? (
-                <div className="text-center py-4">
-                  No disaster data available.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Severity</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Impact</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {disasters.map((disaster, index) => (
-                        <TableRow
-                          key={`${disaster.type}-${disaster.location}-${index}`}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Origin</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Weight (kg)</TableHead>
+                    <TableHead>Volume (m³)</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Created At</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>User ID</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shipments.map((shipment) => (
+                    <TableRow key={shipment.id}>
+                      <TableCell>{shipment.id}</TableCell>
+                      <TableCell>{shipment.origin}</TableCell>
+                      <TableCell>{shipment.destination}</TableCell>
+                      <TableCell>{shipment.cargo_weight} kg</TableCell>
+                      <TableCell>{shipment.cargo_volume} m³</TableCell>
+                      <TableCell>{shipment.priority}</TableCell>
+                      <TableCell>
+                        {new Date(shipment.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            shipment.status === "DELIVERED"
+                              ? "bg-green-500"
+                              : shipment.status === "IN_TRANSIT"
+                              ? "bg-blue-500"
+                              : shipment.status === "PENDING"
+                              ? "bg-yellow-500"
+                              : "bg-gray-500"
+                          }
                         >
-                          <TableCell>{disaster.type}</TableCell>
-                          <TableCell>{disaster.location}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={`${
-                                Number(disaster.severity) > 2
-                                  ? "bg-red-500"
-                                  : Number(disaster.severity) > 1
-                                  ? "bg-yellow-500"
-                                  : "bg-blue-500"
-                              } text-white`}
-                            >
-                              {Number(disaster.severity).toFixed(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(
-                              disaster.date || new Date().toISOString()
-                            ).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{disaster.impact}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                          {shipment.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{shipment.userId}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="currencies">
+        <TabsContent value="disasters" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Currencies</CardTitle>
+              <CardTitle>Recent Disasters</CardTitle>
               <CardDescription>
-                Current currency exchange rates relative to USD.
+                Global disasters that may affect shipping routes.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {currencies.length === 0 ? (
-                <div className="text-center py-4">
-                  No currency data available.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Rate (USD)</TableHead>
-                        <TableHead>24h Change</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currencies.map((currency) => (
-                        <TableRow key={currency.code}>
-                          <TableCell className="font-medium">
-                            {currency.code}
-                          </TableCell>
-                          <TableCell>{currency.name}</TableCell>
-                          <TableCell>{currency.rate.toFixed(4)}</TableCell>
-                          <TableCell>
-                            <span
-                              className={
-                                currency.change > 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }
-                            >
-                              {currency.change > 0 ? "+" : ""}
-                              {currency.change.toFixed(2)}%
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="weather">
-          <Card>
-            <CardHeader>
-              <CardTitle>Weather Forecast</CardTitle>
-              <CardDescription>
-                5-day weather forecast for London.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {weather.length === 0 ? (
-                <div className="text-center py-4">
-                  No weather data available.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Day</TableHead>
-                        <TableHead>Condition</TableHead>
-                        <TableHead>Temperature</TableHead>
-                        <TableHead>Precipitation</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {weather.map((forecast, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{forecast.day}</TableCell>
-                          <TableCell>{forecast.condition}</TableCell>
-                          <TableCell>{forecast.temperature}°C</TableCell>
-                          <TableCell>{forecast.precipitation}%</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Impact</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {disasters.map((disaster, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{disaster.type}</TableCell>
+                      <TableCell>{disaster.location}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            (disaster.severity ?? 1) > 3
+                              ? "destructive"
+                              : (disaster.severity ?? 1) > 2
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {disaster.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {disaster.date
+                          ? new Date(disaster.date).toLocaleDateString()
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell>{disaster.impact}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Shipments</CardTitle>
-            <CardDescription>
-              Number of shipments processed by day
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weeklyShipmentData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="shipments" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Cost by Priority</CardTitle>
-            <CardDescription>
-              Distribution of shipping costs by priority
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={getCostByPriorityData()}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  fill="#8884d8"
-                  label
-                >
-                  {getCostByPriorityData().map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
