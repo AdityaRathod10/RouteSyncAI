@@ -10,7 +10,7 @@ services:
       - key: GEMINI_API_KEY
         value: your_actual_gemini_api_key
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.10"
 
 databases:
   - name: routesyncai-db
