@@ -14,9 +14,14 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/:path*",
+        destination: process.env.NODE_ENV === 'production' 
+          ? "https://routesyncai.onrender.com/:path*"  // Replace with your Render URL
+          : "http://127.0.0.1:8000/:path*",
       },
     ]
+  },
+   env: {
+    BACKEND_URL: process.env.BACKEND_URL || "http://127.0.0.1:8000",
   },
 }
 

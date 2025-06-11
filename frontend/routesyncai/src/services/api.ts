@@ -1,7 +1,10 @@
 import axios from "axios";
 
-// Use the API_URL that matches your setup
-const API_URL = "http://127.0.0.1:8000";
+// Use environment variable for API URL
+const API_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://your-render-app-name.onrender.com" // Replace with your actual Render URL
+    : "http://127.0.0.1:8000";
 
 export const api = axios.create({
   baseURL: API_URL,
