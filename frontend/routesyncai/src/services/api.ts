@@ -3,7 +3,7 @@ import axios from "axios";
 // Use environment variable for API URL
 const API_URL =
   process.env.NODE_ENV === "production"
-    ? "https://your-render-app-name.onrender.com" // Replace with your actual Render URL
+    ? "https://routesyncai.onrender.com" // Your actual Render URL
     : "http://127.0.0.1:8000";
 
 export const api = axios.create({
