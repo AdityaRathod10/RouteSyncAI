@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Package, Truck, Search, Loader2, Ship, Plane, AlertTriangle, Clock, DollarSign, Calendar, ArrowRight, Info } from 'lucide-react'
 import * as maptilersdk from "@maptiler/sdk"
-import "@maptilersdk/dist/maptiler-sdk.css"
+import "@maptiler/sdk/dist/maptiler-sdk.css"
 import { format } from "date-fns"
 
 // Define interfaces
