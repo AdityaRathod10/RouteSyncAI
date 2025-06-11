@@ -12,7 +12,7 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 15000, // Add a timeout to prevent hanging requests
+  timeout: 30000, // Increase timeout for Render cold starts
 });
 
 // Test function to verify CORS is working
@@ -38,6 +38,7 @@ export const findPaths = async (data: Record<string, unknown>) => {
     };
 
     console.log("Sending data to API:", formattedData);
+    console.log("API URL:", API_URL);
 
     // Make the request with explicit headers
     const response = await api.post("/find_paths/", formattedData);
@@ -54,6 +55,11 @@ export const findPaths = async (data: Record<string, unknown>) => {
         code: error.code,
         response: error.response,
         request: error.request,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+        }
       });
 
       if (error.response?.status === 422) {
@@ -62,14 +68,18 @@ export const findPaths = async (data: Record<string, unknown>) => {
         throw new Error(`Validation Error: ${error.response.data.detail[0].msg}`);
       } else if (error.code === "ERR_NETWORK") {
         console.error("Network Error - Check if the server is running");
-        throw new Error("Cannot connect to server. Please make sure the backend is running.");
+        throw new Error("Cannot connect to server. Please check your internet connection and try again.");
       } else if (error.code === "ECONNABORTED") {
         console.error("Request timed out");
         throw new Error("Request timed out. The server might be overloaded.");
+      } else if (error.response?.status === 404) {
+        throw new Error("API endpoint not found. Please check the server configuration.");
+      } else if (error.response && error.response.status >= 500) {
+        throw new Error("Server error. Please try again later.");
       }
     }
 
     console.error("Axios Error:", error);
-    throw error;
+    throw new Error("An unexpected error occurred. Please try again.");
   }
 };

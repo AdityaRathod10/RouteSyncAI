@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RouteMap } from "@/components/route-map";
 import { RouteList } from "@/components/route-list";
 import type { RouteResponse } from "@/lib/types";
+import { findPaths } from "@/services/api"; // Add this import
 
 const CARGO_TYPES = [
   { value: "general", label: "General Merchandise" },
@@ -76,20 +77,9 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/find_paths/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to calculate routes');
-      }
-
-      const data = await response.json();
-      setRoutes(data);
+      // Use your API service instead of hardcoded localhost
+      const response = await findPaths(formData);
+      setRoutes(response);
       setSelectedRoute(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
